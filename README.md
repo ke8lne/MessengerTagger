@@ -18,7 +18,7 @@ npm start
 
 ## Compile
 ```sh
-npm build
+npm run build
 ```
 
 ## Compatibility
