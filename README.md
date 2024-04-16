@@ -11,6 +11,14 @@
 npm install
 ```
 
+### Termux
+```sh
+pkg install nodejs-lts
+git clone https://github.com/ke8lne/MessengerTagger
+cd MessengerTagger
+npm install
+```
+
 ## Run
 ```sh
 npm start
