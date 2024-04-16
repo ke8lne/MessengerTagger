@@ -71,9 +71,10 @@ async function main() {
                          if (!message?.length) console.log(chalk.red(`Please input a message.`));
                          else break inputMsg;
                     }
+                    let parsedMsg = message.replace("{tag}", nickname);
+                    console.log(parsedMsg.replace(nickname, chalk.underline(nickname)));
                     let confirm = await In.confirm(`Send this message to '${thread.isGroup ? '[G] ' : ''}${chalk.underline(thread.name || thread.participants[0].name)}? `);
                     if (!confirm) break select;
-                    let parsedMsg = message.replace("{tag}", nickname);
                     await client.sendMessage(thread.id, parsedMsg, { mentions: [{ id: target.id, offset: parsedMsg.indexOf(nickname), length: nickname.length }] }).catch(console.error);
                     break;
 
