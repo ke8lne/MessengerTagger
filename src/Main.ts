@@ -1,16 +1,33 @@
 import { Client, Thread, User } from "libfb";
+import Crypto from 'crypto-js';
 import chalk from "chalk";
 import * as fs from "fs";
 import Env from "dotenv";
 import path from "path";
 import In from "input";
 
+interface Config {
+     USN: string;
+     PASS: string;
+     KEYHASH: string;
+     AUTORETRY: boolean;
+     DEBUG: boolean;
+}
+
+const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
+
 async function main() {
      console.log(chalk.blue("[ Messenger Mention God ]"));
-     if (fs.existsSync(path.join(process.cwd(), ".env"))) {
-          console.log(chalk.green("Environment Variables loaded."));
+
+     // Used for secured credentals.
+     var _keyhash = (Math.random() + 1).toString(36).substring(2);
+     function loadConfig() {
           Env.config({ path: path.join(process.cwd(), ".env") });
+          _keyhash = process.env["KEYHASH"] || _keyhash;
+          console.log(chalk.green("Environment Variables loaded."));
      }
+
+     if (fs.existsSync(path.join(process.cwd(), ".env"))) loadConfig()
      else {
           console.log(chalk.yellow("Environment Variables not found.") + chalk.cyan(" | Prompting for login credentials instead..."));
           while (true) {
@@ -38,16 +55,35 @@ async function main() {
           }
           let saveCred = await In.confirm("Do you want to save your credentials for later use?");
           if (saveCred) {
-               fs.writeFileSync(path.join(process.cwd(), ".env"), `USN=${process.env["USN"]}\nPASS=${process.env["PASS"]}`, "utf-8");
+               const config: Config = {
+                    USN: Crypto.AES.encrypt(process.env["USN"], _keyhash).toString(),
+                    PASS: Crypto.AES.encrypt(process.env["PASS"], _keyhash).toString(),
+                    KEYHASH: _keyhash,
+                    AUTORETRY: false,
+                    DEBUG: true
+               }
+               fs.writeFileSync(path.join(process.cwd(), ".env"), Object.entries(config).map(o => o[0] + '=' + o[1]).join('\n'), "utf-8");
                console.log(chalk.green("Credentials saved in your local environment variables."));
+               loadConfig();
           }
      }
 
      console.log(chalk.yellow("Logging in..."));
      const client = new Client({ selfListen: false });
-     await client.login(process.env["USN"], process.env["PASS"])
+     await client.login(
+          Crypto.AES.decrypt(process.env["USN"], _keyhash).toString(Crypto.enc.Utf8),
+          Crypto.AES.decrypt(process.env["PASS"], _keyhash).toString(Crypto.enc.Utf8)
+     )
           .then(() => console.log(chalk.green("Logged in.")))
-          .catch(() => (console.log(chalk.red("Failed to log in."), process.exit(1))));
+          .catch(async err => {
+               console.log(chalk.red("Failed to log in."))
+               if (process.env["DEBUG"] == "true") console.error("[DebugErr]:", err);
+               if (process.env["AUTORETRY"] == "true") {
+                    console.log(chalk.yellowBright("Retrying..."));
+                    await delay(4000);
+               }
+               else process.exit(1);
+          });
 
      let thread: Thread, target: User, nickname: string;
      app: while (true) {
@@ -60,7 +96,7 @@ async function main() {
           select: switch (choice) {
                case 0:
                     if (!thread) {
-                         console.log(chalk.red("No thread where selected. Please select a thread first."));
+                         console.log(chalk.red("No thread is selected. Please select a thread first."));
                          break select;
                     }
                     nickname = await In.text(`Type the custom tag that will highlight in the message: `, { default: nickname || '' });
@@ -94,7 +130,7 @@ async function main() {
 
                case 2:
                     if (!thread) {
-                         console.log(chalk.red("No thread where selected. Please select a thread first."));
+                         console.log(chalk.red("No thread is selected. Please select a thread first."));
                          break select;
                     }
                     let nicknames = thread.nicknames;
@@ -111,7 +147,7 @@ async function main() {
                     break;
 
                case 3:
-                    console.log(chalk.green("Logged out. Process exit."));
+                    console.log(chalk.green("Logged out."));
                     process.exit(1);
           }
      }
